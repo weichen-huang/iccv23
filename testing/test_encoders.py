@@ -22,12 +22,12 @@ def test():
     log(output.shape)
     log("Testing TabTransformerEncoder")
 
-    categories = (10, 5, 6, 5, 8)
-    x_categ = torch.randint(0, 5, (1, 5)).cuda()  # category values, from 0 - max number of categories, in the order as passed into the constructor above
+    #categories = (10, 5, 6, 5, 8)
+    #x_categ = torch.randint(0, 5, (1, 5)).cuda()  # category values, from 0 - max number of categories, in the order as passed into the constructor above
     x_cont = torch.randn(1, 10).cuda()  # assume continuous values are already normalized individually
-
+    x_categ = torch.randn(0, 0)
     model = TabTransformerEncoder(
-        categories=categories,  # tuple containing the number of unique values within each category
+        categories=(),  # tuple containing the number of unique values within each category
         num_continuous=10,  # number of continuous values
         dim=32,  # dimension, paper set at 32
         dim_out=128,  # binary prediction, but could be anything
@@ -49,5 +49,6 @@ def test():
     output = encoder(input, device=torch.device("cuda"))
     log(output.shape)
 
-
+if __name__ == "__main__":
+    test()
 

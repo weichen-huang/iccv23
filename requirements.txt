@@ -3,3 +3,4 @@ numpy
 torchvision
 nibabel
 scikit-learn
+opencv-python

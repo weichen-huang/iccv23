@@ -8,7 +8,9 @@ from sklearn.model_selection import train_test_split
 from collections import Counter
 from logger import log
 import nibabel as nib
+import cv2
 
+from tqdm import tqdm
 from datetime import datetime
 
 
@@ -178,6 +180,7 @@ def process_row(dict):
 
     for k, v in dict.items():
         if k == "path":
+            new_dict[k] = v
             continue
         if k == "EXAMDATE":
             date_object = datetime.strptime(v, '%Y-%m-%d')
@@ -234,7 +237,9 @@ def get_tabular_data(verbose=False):
 
     ok_cnt = 0
 
-    for subpath in subpaths:
+    dim0 = dim1 = dim2 = 1e9
+
+    for subpath in tqdm(subpaths):
         patient_id = subpath[3]
         exam_date = subpath[2]
         image_id = subpath[1]
@@ -245,6 +250,10 @@ def get_tabular_data(verbose=False):
             volume = get_volume(image_path)
             if verbose:
                 log(volume.shape)
+            shape = sorted(list(volume.shape))
+            dim0 = min(dim0, shape[0])
+            dim1 = min(dim1, shape[1])
+            dim2 = min(dim2, shape[2])
         except:
             if verbose:
                 log('Failed to get volume for image_path: {}... skipping'.format(image_path), mode="ERROR")
@@ -294,9 +303,132 @@ def get_tabular_data(verbose=False):
 
 
     log('Succeeded/total/patient dict: {}/{}/{}'.format(ok_cnt, len(subpaths), len(patient_dict)))
-
+    # log(patient_dict["082_S_5014"][0]["path"])
     if verbose:
         for i in range(10):
             log('Patient dict[]: {}'.format(patient_dict[list(patient_dict.keys())[i]]))
+        log("Image dimensions: {}, {}, {}".format(dim0, dim1, dim2))
+    return patient_dict, (dim0, dim1, dim2)
 
-    return patient_dict
+
+def get_dynamic_image(frames, normalized=True):
+    """ Adapted from https://github.com/tcvrick/Python-Dynamic-Images-for-Action-Recognition"""
+    """ Takes a list of frames and returns either a raw or normalized dynamic image."""
+
+    def _get_channel_frames(iter_frames, num_channels):
+        """ Takes a list of frames and returns a list of frame lists split by channel. """
+        frames = [[] for channel in range(num_channels)]
+
+        for frame in iter_frames:
+            for channel_frames, channel in zip(frames, cv2.split(frame)):
+                channel_frames.append(channel.reshape((*channel.shape[0:2], 1)))
+        for i in range(len(frames)):
+            frames[i] = np.array(frames[i])
+        return frames
+
+    def _compute_dynamic_image(frames):
+        """ Adapted from https://github.com/hbilen/dynamic-image-nets """
+        num_frames, h, w, depth = frames.shape
+
+        # Compute the coefficients for the frames.
+        coefficients = np.zeros(num_frames)
+        for n in range(num_frames):
+            cumulative_indices = np.array(range(n, num_frames)) + 1
+            coefficients[n] = np.sum(((2 * cumulative_indices) - num_frames) / cumulative_indices)
+
+        # Multiply by the frames by the coefficients and sum the result.
+        x1 = np.expand_dims(frames, axis=0)
+        x2 = np.reshape(coefficients, (num_frames, 1, 1, 1))
+        result = x1 * x2
+        return np.sum(result[0], axis=0).squeeze()
+
+    num_channels = frames[0].shape[2]
+    # print(num_channels)
+    channel_frames = _get_channel_frames(frames, num_channels)
+    channel_dynamic_images = [_compute_dynamic_image(channel) for channel in channel_frames]
+
+    dynamic_image = cv2.merge(tuple(channel_dynamic_images))
+    if normalized:
+        dynamic_image = cv2.normalize(dynamic_image, None, 0, 255, norm_type=cv2.NORM_MINMAX)
+        dynamic_image = dynamic_image.astype('uint8')
+
+    return dynamic_image
+
+
+def get_video_frames(video_path):
+    # Initialize the frame number and create empty frame list
+    video = cv2.VideoCapture(video_path)
+    frame_list = []
+
+    # Loop until there are no frames left.
+    try:
+        while True:
+            more_frames, frame = video.read()
+
+            if not more_frames:
+                break
+            else:
+                frame_list.append(frame)
+
+    finally:
+        video.release()
+
+    return frame_list
+
+def transpose_volume(tensor):
+    sorted_indices = np.argsort(tensor.shape)
+    new_tensor = tensor.transpose(sorted_indices)
+    # expand first dimension by 1 to [1, x, y, z]
+    new_tensor = np.expand_dims(new_tensor, axis=0)
+    return new_tensor
+
+def get_frames(array):
+    array = get_dynamic_image(array)
+    array = np.expand_dims(array, 0)
+    array = np.concatenate([array, array, array], 0)
+    return array
+
+def slice_volume(input_volume, x, y, z):
+    """
+    Slice both sides of a volume to obtain a new volume with dimensions [x, y, z].
+
+    Parameters:
+    - input_volume: The input 3D volume.
+    - x, y, z: The desired dimensions for the sliced volume.
+
+    Returns:
+    - sliced_volume: The sliced 3D volume.
+    """
+    # Determine the starting indices for slicing
+    start_x = (input_volume.shape[1] - x) // 2
+    start_y = (input_volume.shape[2] - y) // 2
+    start_z = (input_volume.shape[3] - z) // 2
+
+    # Create slices for each dimension
+    x_slice = slice(start_x, start_x + x)
+    y_slice = slice(start_y, start_y + y)
+    z_slice = slice(start_z, start_z + z)
+
+    # Slice the volume using the defined slices
+    sliced_volume = input_volume[:, x_slice, y_slice, z_slice]
+
+    return sliced_volume
+
+def one_hot_encode(value, num_classes):
+    """
+    Perform one-hot encoding on a given value.
+
+    Parameters:
+    - value: The categorical value to be one-hot encoded.
+    - num_classes: The total number of classes/categories.
+
+    Returns:
+    - one_hot_vector: The one-hot encoded vector.
+    """
+    # Initialize an array of zeros with the length equal to the number of classes
+    one_hot_vector = np.zeros(num_classes, dtype=int)
+
+    # Set the corresponding index to 1 for the given value
+    one_hot_vector[value] = 1
+
+    return one_hot_vector
