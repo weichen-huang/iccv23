@@ -54,6 +54,7 @@ class TemporalDataset(Dataset):
         cur["dx"] = self.data[index]["dx"]
         volume, image = self.process_image(self.data[index]["path"])
         cur["modalityb"] = self.data[index][self.modalityb]
+        cur["ptid"] = self.data[index]["ptid"]
         if self.volume:
             cur["image"] = volume
         else:

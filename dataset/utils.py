@@ -206,7 +206,7 @@ def get_tabular_data(verbose=False):
         # log current dir
         log('Current dir: {}'.format(os.getcwd()))
     # chdir to ../
-    os.chdir('../')
+    os.chdir('/workdrive/yangcheng_work/icml23/')
 
     table = pd.read_csv("data/tadpole_challenge/TADPOLE_D1_D2.csv")
     metadata = pd.read_csv("data/adni/metadata.csv")

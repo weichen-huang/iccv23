@@ -60,7 +60,7 @@ class ContrastiveModel(nn.Module):
         else:
             raise ValueError("tabmode must be tabatt or tabtransformer")
 
-        self.loss = losses.InfoNCE(temperature=self.params["temp"])
+        self.loss = losses.CLIPLoss(temperature=self.params["temp"])
 
     def forward(self, batch):
 
@@ -88,13 +88,32 @@ class ContrastiveModel(nn.Module):
             image_mapping[identites[i]].append(image_embeddings[i])
             tabular_mapping[identites[i]].append(tabular_embeddings[i])
 
+        left = []
+        right = []
+        ok1 = False
+        ok2 = False
 
         for k, v in image_mapping.items():
             if len(v) > 1:
                 for i in range(1, len(v)):
-                    local_loss += self.loss(v[0], v[i])
+                    ok1 = True
+                    left.append(v[0])
+                    right.append(v[i])
 
-        loss = global_loss + local_loss
+        for k, v in tabular_mapping.items():
+            if len(v) > 1:
+                for i in range(1, len(v)):
+                    ok2 = True
+                    left.append(v[0])
+                    right.append(v[i])
+
+        if ok1 and ok2:
+            local_loss = self.loss(torch.cat(left, dim=0), torch.cat(right, dim=0))
+            loss = global_loss + local_loss
+        else:
+            loss = global_loss
+        print(" global loss: ", global_loss, " local loss: ", local_loss)
+        print(" loss: ", loss)
 
         return loss, global_loss, local_loss
 
@@ -102,14 +121,14 @@ class ContrastiveModel(nn.Module):
         if self.params["tabmode"] == "tabtransformer":
             if self.params["is_cont"]:
                 x_disc = torch.randn(0, 0)
-                x_cont = data["tabular_data"]
+                x_cont = data
                 return self.tabular_encoder(x_disc, x_cont)
             else:
                 x_cont = torch.randn(0, 0)
-                x_disc = data["tabular_data"]
+                x_disc = data
                 return self.tabular_encoder(x_disc, x_cont)
         else:
-            return self.tabular_encoder(data["tabular_data"])
+            return self.tabular_encoder(data)
     def save(self, path):
         torch.save(self.state_dict(), path)
 

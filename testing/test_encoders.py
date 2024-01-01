@@ -11,7 +11,7 @@ def test():
     output = encoder(input)
     log(output.shape)
     log("Testing VolumeEncoder")
-    encoder = VolumeEncoder(input_resolution=256, output_dim=128).cuda()
+    encoder = VolumeEncoder(input_resolution=256, output_dim=128, n_input_channels=3).cuda()
     input = torch.rand(1, 3, 256, 256, 256).cuda()
     output = encoder(input)
     log(output.shape)
@@ -23,7 +23,8 @@ def test():
     log("Testing TabTransformerEncoder")
 
     #categories = (10, 5, 6, 5, 8)
-    #x_categ = torch.randint(0, 5, (1, 5)).cuda()  # category values, from 0 - max number of categories, in the order as passed into the constructor above
+    x_categ = torch.randint(0, 5, (1, 5)).cuda()  # category values, from 0 - max number of categories, in the order as passed into the constructor above
+    # print(x_categ)
     x_cont = torch.randn(1, 10).cuda()  # assume continuous values are already normalized individually
     x_categ = torch.randn(0, 0)
     model = TabTransformerEncoder(
