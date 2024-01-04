@@ -43,6 +43,9 @@ def test():
     log(x_cont.shape)
     pred = model(x_categ, x_cont).cuda()  # (1, 1)
     log(pred.shape)
+    pred = torch.squeeze(pred, dim=1)
+    pred = torch.split(pred, 1, dim=0)
+    print(pred[0].shape, len(pred))
 
     log("Testing TextEncoder")
     encoder = TextEncoder(output_dim=128).cuda()

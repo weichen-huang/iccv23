@@ -88,30 +88,46 @@ class ContrastiveModel(nn.Module):
             image_mapping[identites[i]].append(image_embeddings[i])
             tabular_mapping[identites[i]].append(tabular_embeddings[i])
 
-        left = []
-        right = []
-        ok1 = False
-        ok2 = False
+        samples = {}
 
-        for k, v in image_mapping.items():
-            if len(v) > 1:
-                for i in range(1, len(v)):
-                    ok1 = True
-                    left.append(v[0])
-                    right.append(v[i])
+        # image mapping
 
-        for k, v in tabular_mapping.items():
-            if len(v) > 1:
-                for i in range(1, len(v)):
-                    ok2 = True
-                    left.append(v[0])
-                    right.append(v[i])
+        for id in image_mapping:
+            samples[id] = []
+            for i in range(len(image_mapping[id])):
+                for j in range(i+1, len(image_mapping[id])):
+                    samples[id].append([image_mapping[id][i], image_mapping[id][j]])
 
-        if ok1 and ok2:
-            local_loss = self.loss(torch.cat(left, dim=0), torch.cat(right, dim=0))
-            loss = global_loss + local_loss
-        else:
-            loss = global_loss
+        for id in tabular_mapping:
+            for i in range(len(tabular_mapping[id])):
+                for j in range(i+1, len(tabular_mapping[id])):
+                    samples[id].append([tabular_mapping[id][i], tabular_mapping[id][j]])
+
+        batch_size = batch["image"].shape[0]
+        ok = False
+        while not ok:
+            cur_sample_a = []
+            cur_sample_b = []
+            ok = True
+            for id in samples:
+                if len(samples[id]) == 0:
+                    continue
+                ok = False
+                x = samples[id].pop()
+                cur_sample_a.append(x[0])
+                cur_sample_b.append(x[1])
+                if len(cur_sample_a) == batch_size:
+                    break
+
+            while len(cur_sample_a) < batch_size:
+                cur_sample_a.append(torch.zeros_like(image_embeddings[0]))
+            while len(cur_sample_b) < batch_size:
+                cur_sample_b.append(torch.zeros_like(image_embeddings[0]))
+
+            local_loss += self.loss(torch.cat(cur_sample_a, dim=0), torch.cat(cur_sample_b, dim=0))
+
+        loss = global_loss + local_loss
+
         print(" global loss: ", global_loss, " local loss: ", local_loss)
         print(" loss: ", loss)
 
