@@ -1,30 +1,28 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-# import torch data
-from torch.utils.data import DataLoader
-from torch.utils.data import Dataset
-
+from torch.utils.data import DataLoader, Dataset
 import torchvision
-
 from dataset.utils import *
 
 
 class TemporalDataset(Dataset):
-    def __init__(self, modality_groups=None, modalityb="dx", test_size=0.2, mode="train", volume=True):
+    def __init__(self, modality_groups=None, modalityb="dx", test_size=0.2, mode="train",
+                 volume=True, fold_indices=None):
         self.patient_dict, (self.x, self.y, self.z) = get_tabular_data()
         self.data = []
         self.modalityb = modalityb
         self.volume = volume
 
         if modality_groups is None:
-            modality_groups = {"dx": ["DX", "ADAS13", "Ventricles", "EXAMDATE"],
-                               "cog": ["CDRSB", "ADAS11", "MMSE", "RAVLT_immediate"],
-                               "vol": ["Hippocampus", "WholeBrain", "Entorhinal", "MidTemp"],
-                               "pet": ["FDG", "AV45"],
-                               "bio": ["ABETA_UPENNBIOMK9_04_19_17", "TAU_UPENNBIOMK9_04_19_17", "PTAU_UPENNBIOMK9_04_19_17"],
-                               "demo": ["APOE4", "AGE"]}
+            modality_groups = {
+                "dx": ["DX", "ADAS13", "Ventricles", "EXAMDATE"],
+                "cog": ["CDRSB", "ADAS11", "MMSE", "RAVLT_immediate"],
+                "vol": ["Hippocampus", "WholeBrain", "Entorhinal", "MidTemp"],
+                "pet": ["FDG", "AV45"],
+                "bio": ["ABETA_UPENNBIOMK9_04_19_17", "TAU_UPENNBIOMK9_04_19_17", "PTAU_UPENNBIOMK9_04_19_17"],
+                "demo": ["APOE4", "AGE"]
+            }
 
         for i, (patient, v) in enumerate(self.patient_dict.items()):
             for j in range(len(v)):
@@ -41,13 +39,14 @@ class TemporalDataset(Dataset):
 
                 self.data.append(row)
 
-        # train test split no label
-        self.train_data, self.test_data = train_test_split(self.data, test_size=test_size, random_state=42)
-        if mode == "train":
-            self.data = self.train_data
+        if fold_indices is not None:
+            self.data = [self.data[i] for i in fold_indices]
         else:
-            self.data = self.test_data
-        # row structure: for each data point, we have ptid, path and each group
+            self.train_data, self.test_data = train_test_split(self.data, test_size=test_size, random_state=42)
+            if mode == "train":
+                self.data = self.train_data
+            else:
+                self.data = self.test_data
 
     def __getitem__(self, index):
         cur = {}
@@ -59,7 +58,6 @@ class TemporalDataset(Dataset):
             cur["image"] = volume
         else:
             cur["image"] = image
-
         return cur
 
     def __len__(self):
