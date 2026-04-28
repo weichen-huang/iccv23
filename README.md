@@ -124,7 +124,7 @@ If you find this work useful, please cite our paper:
 
 ```bibtex
 @InProceedings{Huang_2023_ICCV,
-    author    = {Huang, Weichen and Xing, Xixi and Gao, Junxin and Su, Yuhan and Venkataramanan, Shiv and Lam, Bryan and Shen, Li and Nie, Jingshan and Liu, Yue},
+    author    = {Huang, Weichen},
     title     = {Multimodal Contrastive Learning and Tabular Attention for Automated Alzheimer's Disease Prediction},
     booktitle = {Proceedings of the IEEE/CVF International Conference on Computer Vision (ICCV) Workshops},
     month     = {October},
